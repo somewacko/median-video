@@ -115,6 +115,10 @@ void MedianFilter::init_median_lists(int size)
     std::vector<Pixel> vec(filter_length, pixel);
     median_lists = std::vector< std::vector<Pixel> >(size, vec);
 
+    for (auto vec : median_lists)
+        for (auto pix : vec)
+            pix.gray = std::rand();
+
     is_init = true;
 }
 
