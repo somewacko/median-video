@@ -3,52 +3,87 @@
  *
  * Takes a video and processes it through a pixelwise median filter.
  *
- * Usage:
- *      ./MedianVideo [filename | live]
+ * Usage: MedianVideo input_file output_file [filter_length]
  */
 
 #include <opencv2/opencv.hpp>
 
+#include <cstdlib>
+#include <iomanip>
 #include <iostream>
+#include <string>
 
 #include "MedianFilter.hpp"
 
 
+void fatal_error(const std::string &message)
+{
+    std::cerr << message << std::endl;
+    exit(EXIT_FAILURE);
+}
+
+
 int main(int argc, char** argv )
 {
-    // TODO: Option to process video instead
+    // Parse args
 
+    if (argc != 3 && argc != 4)
+        fatal_error("Usage: MedianVideo input_file output_file [filter_length]");
 
-    // Open camera stream
+    std::string input_filename( argv[1] );
+    std::string output_filename( argv[2] );
+    int filter_length = (argc == 4 ? std::atoi(argv[3]) : 5);
+
+    if (filter_length <= 0)
+        fatal_error("Filter length must be a nonzero positive integer");
+
+    // Open video readers and writers
 
     cv::VideoCapture video_capture;
 
-    if ( ! video_capture.open(0) )
-    {
-        std::cout << "Error: Unable to open default camera!" << std::endl;
-        return EXIT_FAILURE;
-    }
+    if ( ! video_capture.open(input_filename) )
+        fatal_error("Unable to read from " + input_filename);
 
-    // TODO: Make command-line arg to change filter length
-    MedianFilter filter(10);
+    cv::VideoWriter video_writer;
+
+    int ex = static_cast<int>(video_capture.get(CV_CAP_PROP_FOURCC));
+    cv::Size s = cv::Size((int)video_capture.get(CV_CAP_PROP_FRAME_WIDTH),
+                          (int)video_capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+
+    video_writer.open(output_filename, ex, video_capture.get(CV_CAP_PROP_FPS), s, true);
+
+    if ( ! video_writer.isOpened() )
+        fatal_error("Unable to write to " + output_filename);
+
+    // Loop through and process frames
+
+    // Printing vars
+    int count = 0;
+    const int total = video_capture.get(CV_CAP_PROP_FRAME_COUNT);
+    const int width = std::to_string(total).size();
+
+    std::cout << std::endl;
+    std::cout << "'" << input_filename << "' -> '" << output_filename << "'" << std::endl;
+    std::cout << "Filter length: " << filter_length << std::endl;
+    std::cout << std::endl;
+
+    MedianFilter filter(filter_length);
 
     while (true)
     {
+        std::cout << "\rProcessing frame "
+            << std::setw(width) << count++ << "/"
+            << std::setw(width) << total   << " " << std::flush;
+
         cv::Mat frame;
         video_capture >> frame;
 
-        // TODO: Make command-line arg to change size
-        cv::Size size(320, 240);
-        cv::resize(frame, frame, size);
-
         if ( ! frame.empty() )
-            cv::imshow("Display", filter.process_frame(frame));
+            video_writer << filter.process_frame(frame);
         else
             break;
-
-        if ( cv::waitKey(1) == 27 )
-            break;
     }
+    std::cout << std::endl << std::endl;
 
     return EXIT_SUCCESS;
 }
