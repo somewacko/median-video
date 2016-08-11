@@ -101,7 +101,7 @@ int main(int argc, char** argv )
             video_writer << filter.process_frame(frame);
             toc = std::clock();
 
-            total_time += double(tic-toc) / CLOCKS_PER_SEC;
+            total_time += double(toc-tic) / CLOCKS_PER_SEC;
 
             std::cout << "| Avg time: "
                 << std::fixed << std::setprecision(2)
