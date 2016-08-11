@@ -9,9 +9,11 @@
 #include <opencv2/opencv.hpp>
 
 #include <cstdlib>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <sstream>
 
 #include "MedianFilter.hpp"
 
@@ -20,6 +22,14 @@ void fatal_error(const std::string &message)
 {
     std::cerr << message << std::endl;
     exit(EXIT_FAILURE);
+}
+
+
+std::string sec_to_time(const double time)
+{
+    std::stringstream ss;
+    ss << std::setw(4) << (int)time/60 << ":" << (int)time%60;
+    return ss.str();
 }
 
 
@@ -49,8 +59,9 @@ int main(int argc, char** argv )
     int ex = static_cast<int>(video_capture.get(CV_CAP_PROP_FOURCC));
     cv::Size s = cv::Size((int)video_capture.get(CV_CAP_PROP_FRAME_WIDTH),
                           (int)video_capture.get(CV_CAP_PROP_FRAME_HEIGHT));
+    int fps = video_capture.get(CV_CAP_PROP_FPS);
 
-    video_writer.open(output_filename, ex, video_capture.get(CV_CAP_PROP_FPS), s, true);
+    video_writer.open(output_filename, ex, fps, s, true);
 
     if ( ! video_writer.isOpened() )
         fatal_error("Unable to write to " + output_filename);
@@ -61,6 +72,7 @@ int main(int argc, char** argv )
     int count = 0;
     const int total = video_capture.get(CV_CAP_PROP_FRAME_COUNT);
     const int width = std::to_string(total).size();
+    double total_time = 0;
 
     std::cout << std::endl;
     std::cout << "'" << input_filename << "' -> '" << output_filename << "'" << std::endl;
@@ -72,14 +84,33 @@ int main(int argc, char** argv )
     while (true)
     {
         std::cout << "\rProcessing frame "
-            << std::setw(width) << count++ << "/"
+            << std::setw(width) << ++count << "/"
             << std::setw(width) << total   << " " << std::flush;
 
         cv::Mat frame;
         video_capture >> frame;
 
         if ( ! frame.empty() )
+        {
+            clock_t tic, toc;
+
+            if (count == 1)
+                filter.init_median_lists(frame.total());
+
+            tic = std::clock();
             video_writer << filter.process_frame(frame);
+            toc = std::clock();
+
+            total_time += double(tic-toc) / CLOCKS_PER_SEC;
+
+            std::cout << "| Avg time: "
+                << std::fixed << std::setprecision(2)
+                << total_time / count << "s ";
+
+            std::cout << "| Est. time left: "
+                << std::setw(8)
+                << (total-count)*(total_time/count) << "s ";
+        }
         else
             break;
     }
